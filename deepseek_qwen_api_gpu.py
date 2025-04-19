@@ -1,7 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from transformers import AutoTokenizer, AutoModelForCausalLM
-import rdflib
 import torch
 
 # Initialize FastAPI
@@ -40,39 +39,36 @@ Only return triples with factual information.
     outputs = model.generate(**inputs, max_new_tokens=max_tokens)
     response = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-    # Try to clean the response
+    # Clean the response to return only triples
     if "Output format:" in response:
         response = response.split("Output format:")[-1].strip()
 
     return response
 
-# Function to build RDF graph
-def build_medical_knowledge_graph(triples_text):
-    graph = rdflib.Graph()
+# Function to convert triples to TSV format
+def triples_to_tsv(triples_text):
+    tsv_output = []
     for line in triples_text.strip().split("\n"):
         if line.startswith("(") and line.endswith(")"):
             try:
                 s, p, o = [x.strip() for x in line[1:-1].split(",")]
-                graph.add((
-                    rdflib.URIRef(f"http://example.org/{s.replace(' ', '_')}"),
-                    rdflib.URIRef(f"http://example.org/{p.replace(' ', '_')}"),
-                    rdflib.URIRef(f"http://example.org/{o.replace(' ', '_')}"),
-                ))
+                tsv_output.append(f"{s}\t{p}\t{o}")
             except Exception as e:
                 print(f"Error processing line: {line}, Error: {e}")
-    return graph
+    return "\n".join(tsv_output)
 
 # FastAPI endpoint
 @app.post("/extract-triples")
 async def extract_kg(input_data: PatientChartInput):
     try:
+        # Extract triples from the text
         triples = extract_medical_kg_triples(input_data.text, input_data.max_tokens)
-        kg = build_medical_knowledge_graph(triples)
-        turtle_output = kg.serialize(format="turtle")
+        
+        # Convert the triples to TSV format
+        tsv_output = triples_to_tsv(triples)
 
         return {
-            "triples": triples,
-            "rdf_turtle": turtle_output
+            "triples": tsv_output
         }
 
     except Exception as e:
