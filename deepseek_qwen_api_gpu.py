@@ -68,7 +68,7 @@ async def extract_kg(input_data: PatientChartInput):
     try:
         triples = extract_medical_kg_triples(input_data.text, input_data.max_tokens)
         kg = build_medical_knowledge_graph(triples)
-        turtle_output = kg.serialize(format="turtle").decode()
+        turtle_output = kg.serialize(format="turtle")
 
         return {
             "triples": triples,
