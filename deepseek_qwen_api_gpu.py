@@ -10,7 +10,7 @@ app = FastAPI()
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Load model and tokenizer
-model_name = "deepseek/qwen"  # Change this to the actual model path if different
+model_name = "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B"  # Change this to the actual model path if different
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 model = AutoModelForSequenceClassification.from_pretrained(model_name).to(device)
 
