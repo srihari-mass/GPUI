@@ -1,39 +1,57 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 import torch
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from transformers import AutoTokenizer, AutoModelForCausalLM
+from accelerate import init_empty_weights, infer_auto_device_map, load_checkpoint_and_dispatch
 
 # Initialize FastAPI app
 app = FastAPI()
 
-# Check if GPU is available and set device
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# Model name
+model_name = "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B"
 
-# Load model and tokenizer
-model_name = "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B"  # Change this to the actual model path if different
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-model = AutoModelForSequenceClassification.from_pretrained(model_name).to(device)
+# Load tokenizer
+tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
 
-# Define the input structure for requests
+# Load model with accelerate for multi-GPU
+with init_empty_weights():
+    model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True)
+
+device_map = infer_auto_device_map(
+    model,
+    max_memory={i: "24GiB" for i in range(torch.cuda.device_count())},
+    no_split_module_classes=["QWenBlock"],  # Adjust based on model architecture
+)
+
+model = load_checkpoint_and_dispatch(
+    model, model_name,
+    device_map=device_map,
+    no_split_module_classes=["QWenBlock"]
+)
+
+# Define request input structure
 class InputText(BaseModel):
-    text: str
+    prompt: str
+    max_tokens: int = 100
+    temperature: float = 0.7
 
-# Endpoint for inference
-@app.post("/predict")
-async def predict(input_data: InputText):
-    # Tokenize the input text
-    inputs = tokenizer(input_data.text, return_tensors="pt").to(device)
+@app.post("/generate")
+async def generate_text(input_data: InputText):
+    # Tokenize input
+    inputs = tokenizer(input_data.prompt, return_tensors="pt").to(model.device)
 
-    # Make the prediction
+    # Generate text
     with torch.no_grad():
-        outputs = model(**inputs)
-    
-    # Assuming the output is logits for classification (adjust accordingly)
-    logits = outputs.logits
-    predicted_class = logits.argmax(dim=-1).item()
+        output_tokens = model.generate(
+            **inputs,
+            max_new_tokens=input_data.max_tokens,
+            temperature=input_data.temperature,
+            do_sample=True,
+            top_p=0.95
+        )
 
-    # Return the result
-    return {"predicted_class": predicted_class, "logits": logits.tolist()}
+    generated_text = tokenizer.decode(output_tokens[0], skip_special_tokens=True)
+    return {"generated_text": generated_text}
 
 # Run the app
 if __name__ == "__main__":
