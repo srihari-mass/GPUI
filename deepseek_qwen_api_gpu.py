@@ -18,7 +18,7 @@ model = AutoModelForCausalLM.from_pretrained(
 )
 
 # Set up generation pipeline
-pipeline = TextGenerationPipeline(model=model, tokenizer=tokenizer, device=0)
+pipeline = TextGenerationPipeline(model=model, tokenizer=tokenizer)
 
 # Define input structure
 class InputText(BaseModel):
