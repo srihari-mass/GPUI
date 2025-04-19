@@ -102,13 +102,13 @@ async def process_kg(input_data: PatientChartInput):
 
 # FastAPI endpoint for extraction
 @app.post("/extract-triples")
-async def extract_kg(input_data: PatientChartInput, background_tasks: BackgroundTasks):
+async def extract_kg(input_data: PatientChartInput):
     try:
-        # Start processing in the background
-        background_tasks.add_task(process_kg, input_data)
-        return {"message": "Request received. Processing in the background."}
+        result = await process_kg(input_data)
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 # FastAPI endpoint to query the KG
 @app.get("/query-kg")
