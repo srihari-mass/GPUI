@@ -23,12 +23,11 @@ device_map = infer_auto_device_map(
     no_split_module_classes=["QWenBlock"],  # Adjust based on model architecture
 )
 
-model = load_checkpoint_and_dispatch(
-    model, model_name,
-    device_map=device_map,
-    no_split_module_classes=["QWenBlock"]
+model = AutoModelForCausalLM.from_pretrained(
+    model_name,
+    device_map="auto",
+    torch_dtype=torch.float16  # or bfloat16 depending on GPU
 )
-
 # Define request input structure
 class InputText(BaseModel):
     prompt: str
